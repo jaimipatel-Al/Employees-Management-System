@@ -1,1 +1,20 @@
 @import './base.css';
+
+/* Handle scroll */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+
+/* Steeper window  */
+.v-window__container {
+  padding: 4px 4px 40px 8px;
+}

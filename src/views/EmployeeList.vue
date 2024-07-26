@@ -1,104 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useEmployeeStore } from '../stores/employee'
+import ToastMessage from '../components/elements/ToastMessage.vue'
 
 const router = useRouter()
+const employeeStore = useEmployeeStore()
 
-const desserts = ref([
-  {
-    name: 'Frozen Yogurt',
-    calories: 159,
-    fat: 6.0,
-    carbs: 24,
-    protein: 4.0,
-    iron: '1'
-  },
-  {
-    name: 'Jelly bean',
-    calories: 375,
-    fat: 0.0,
-    carbs: 94,
-    protein: 0.0,
-    iron: '0'
-  },
-  {
-    name: 'KitKat',
-    calories: 518,
-    fat: 26.0,
-    carbs: 65,
-    protein: 7,
-    iron: '6'
-  },
-  {
-    name: 'Eclair',
-    calories: 262,
-    fat: 16.0,
-    carbs: 23,
-    protein: 6.0,
-    iron: '7'
-  },
-  {
-    name: 'Gingerbread',
-    calories: 356,
-    fat: 16.0,
-    carbs: 49,
-    protein: 3.9,
-    iron: '16'
-  },
-  {
-    name: 'Ice cream sandwich',
-    calories: 237,
-    fat: 9.0,
-    carbs: 37,
-    protein: 4.3,
-    iron: '1'
-  },
-  {
-    name: 'Lollipop',
-    calories: 392,
-    fat: 0.2,
-    carbs: 98,
-    protein: 0,
-    iron: '2'
-  },
-  {
-    name: 'Cupcake',
-    calories: 305,
-    fat: 3.7,
-    carbs: 67,
-    protein: 4.3,
-    iron: '8'
-  },
-  {
-    name: 'Honeycomb',
-    calories: 408,
-    fat: 3.2,
-    carbs: 87,
-    protein: 6.5,
-    iron: '45'
-  },
-  {
-    name: 'Donut',
-    calories: 452,
-    fat: 25.0,
-    carbs: 51,
-    protein: 4.9,
-    iron: '22'
-  }
-])
+const employeesList = computed(() => [...employeeStore.employees])
+const isToastMessage = ref(false)
+const toastMessage = ref('')
 
 const headers = [
   {
-    title: 'Dessert (100g serving)',
+    title: 'Profile Picture',
     align: 'start',
     sortable: false,
-    key: 'name'
+    key: 'profile'
   },
-  { title: 'Calories', key: 'calories', align: 'end' },
-  { title: 'Fat (g)', key: 'fat', align: 'end' },
-  { title: 'Carbs (g)', key: 'carbs', align: 'end' },
-  { title: 'Protein (g)', key: 'protein', align: 'end' },
-  { title: 'Iron (%)', key: 'iron', align: 'end' }
+  { title: 'Name', key: 'name', align: 'start' },
+  { title: 'Department', key: 'professionalDetails.department', align: 'center' },
+  { title: 'Designation', key: 'professionalDetails.designation', align: 'center' },
+  { title: 'Email', key: 'personalDetails.email', align: 'center' },
+  { title: 'Mobile Number', key: 'personalDetails.mobile', align: 'end' },
+  { title: 'Resume', key: 'resume', align: 'center' },
+  { title: 'Action', align: 'center', key: 'action' }
 ]
 
 const itemsPerPage = ref(5)
@@ -122,9 +48,9 @@ const FakeAPI = {
       setTimeout(() => {
         const start = (page - 1) * itemsPerPage
         const end = start + itemsPerPage
-        const items = desserts.value.slice()
+        const items = employeesList.value.slice()
 
-        if (sortBy.length) {
+        if (sortBy?.length) {
           const sortKey = sortBy[0].key
           const sortOrder = sortBy[0].order
           items.sort((a, b) => {
@@ -136,15 +62,55 @@ const FakeAPI = {
 
         const paginated = items.slice(start, end)
 
-        resolve({ items: paginated, total: items.length })
+        resolve({ items: paginated, total: items?.length })
       }, 500)
     })
   }
 }
 
 const addNewEmployee = () => {
+  employeeStore.setUpdatedId(null)
   router.push({ name: 'add-employee' })
 }
+
+const editEmployee = (item) => {
+  employeeStore.setUpdatedId(item.id)
+  employeeStore.personalDetailsUpdate({ ...item.personalDetails })
+  employeeStore.bankDetailsUpdate({ ...item.bankDetails })
+  employeeStore.professionalDetailsUpdate({ ...item.professionalDetails })
+  employeeStore.educationDetailsUpdate([...item.educationDetails])
+  employeeStore.experienceDetailsUpdate([...item.experienceDetails])
+  employeeStore.currentOrganizationDetailsUpdate({ ...item.currentOrganizationDetails })
+
+  router.push({ name: 'edit-employee', params: { id: item.id } })
+}
+const deleteEmployee = (id) => {
+  employeeStore.deleteEmployees(id)
+  isToastMessage.value = true
+  toastMessage.value = 'Employee detail deleted successfully!!'
+}
+
+const downloadResume = (file) => {
+  const url = URL.createObjectURL(file)
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  document.body.appendChild(a)
+  a.click()
+
+  // Clean up
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+const imageSrc = (file) => {
+  return URL.createObjectURL(file)
+}
+
+watch(employeesList, () => {
+  loadItems({ page: 1, itemsPerPage: itemsPerPage.value })
+})
 </script>
 
 <template>
@@ -165,7 +131,51 @@ const addNewEmployee = () => {
       item-value="name"
       loading-text="Loading... Please wait"
       @update:options="loadItems"
-    ></v-data-table-server>
+    >
+      <!-- profile -->
+      <template v-slot:item.profile="{ item }">
+        <img
+          :src="imageSrc(item.personalDetails.profile)"
+          :alt="item.personalDetails.fname"
+          class="profile-image"
+        />
+      </template>
+      <template v-slot:item.name="{ item }">
+        {{
+          item.personalDetails.fname +
+          ' ' +
+          item.personalDetails.mname +
+          ' ' +
+          item.personalDetails.lname
+        }}
+      </template>
+      <template v-slot:item.resume="{ item }">
+        <v-icon
+          icon="mdi-download"
+          size="large"
+          color="indigo"
+          class="mr-1 cursor-pointer"
+          @click="downloadResume(item.professionalDetails.resume)"
+        ></v-icon>
+      </template>
+      <template v-slot:item.action="{ item }">
+        <v-icon
+          icon="mdi-pencil"
+          size="large"
+          color="green-darken-2"
+          class="mr-1 cursor-pointer"
+          @click="editEmployee(item)"
+        ></v-icon>
+        <v-icon
+          icon="mdi-delete"
+          size="large"
+          color="red-darken-2"
+          class="mr-1 cursor-pointer"
+          @click="deleteEmployee(item.id)"
+        ></v-icon>
+      </template>
+    </v-data-table-server>
+    <ToastMessage v-model:isToastMessage="isToastMessage" :toastMessage="toastMessage" />
   </div>
 </template>
 
@@ -175,5 +185,10 @@ const addNewEmployee = () => {
   border-radius: 8px;
   width: 90%;
   margin: 20px auto;
+}
+.profile-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
 }
 </style>
